@@ -9,8 +9,8 @@ import torch.nn.functional as F
 from timm.optim import create_optimizer_v2
 
 import numpy as np
-# From https://github.com/lyakaap/Landmark2019-1st-and-3rd-Place-Solution/blob/master/src/modeling/metric_learning.py
-# Added type annotations, device, and 16bit support
+
+
 class ArcMarginProduct(nn.Module):
     r"""Implement of large margin arc distance: :
     Args:
@@ -87,6 +87,8 @@ class LitModule(pl.LightningModule):
             weight_decay: float,
             len_train_dl: int,
             max_epochs: int,
+            bnneck=False,
+            arcface=True,
             **kw,
     ):
         super().__init__()
@@ -101,14 +103,21 @@ class LitModule(pl.LightningModule):
             self.embedding_size = self.model.get_classifier().in_features
         self.model.reset_classifier(num_classes=0, global_pool="avg")
         self.dropout = nn.Dropout(0.2)
-        self.arc = ArcMarginProduct(
-            in_features=self.embedding_size,
-            out_features=num_classes,
-            s=arc_s,
-            m=arc_m,
-            easy_margin=arc_easy_margin,
-            ls_eps=arc_ls_eps,
-        )
+        self.arcface = arcface
+        if arcface:
+            self.arc = ArcMarginProduct(
+                in_features=self.embedding_size,
+                out_features=num_classes,
+                s=arc_s,
+                m=arc_m,
+                easy_margin=arc_easy_margin,
+                ls_eps=arc_ls_eps,
+            )
+        else:
+            self.arc = nn.Linear(self.embedding_size, num_classes)
+        if bnneck:
+            self.bnneck = nn.BatchNorm1d(self.embedding_size)
+
         self.loss_fn = F.cross_entropy
 
     def forward(self, images: torch.Tensor) -> torch.Tensor:
@@ -142,7 +151,13 @@ class LitModule(pl.LightningModule):
     def _step(self, batch: Dict[str, torch.Tensor], step: str) -> torch.Tensor:
         images, targets = batch["images"], batch["target"]
         embeddings = self.dropout(self(images))
-        outputs = self.arc(embeddings, targets, self.device)
+
+        if hasattr(self, 'bnneck'):
+            embeddings = self.bnneck(embeddings)
+        if self.arcface:
+            outputs = self.arc(embeddings, targets, self.device)
+        else:
+            outputs = self.arc(embeddings)
         loss = self.loss_fn(outputs, targets)
         acc = np.mean((torch.argmax(outputs, 1).cpu().numpy() == targets.cpu().numpy())).item()
         self.log(f"{step}_loss", loss)

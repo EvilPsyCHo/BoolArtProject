@@ -2,14 +2,14 @@
 project: lostpet
 data: data25
 seed: 2022
-output_dir: /data/hse/model/
+output_dir: /data/hse/model/                         # Modify according to some local path
 
 # DataModual
-train_csv: /data/hse/data/train.csv
-test_csv: /data/hse/data/val.csv
+train_csv: /data/hse/data_crop_body/train.csv        # Modify according to original data path
+test_csv: /data/hse/data_crop_body/val.csv           # Modify according to original data path
 image_size: 224
 batch_size: 32
-num_workers: 4  # larger need big RAM
+num_workers: 4
 
 # Model
 model_type: LitModule
@@ -17,7 +17,7 @@ model_name: swin_base_patch4_window7_224
 pretrained: true
 drop_rate: 0.0
 embedding_size: 512
-num_classes: 44842
+num_classes: 46400
 arc_s: 30.0
 arc_m: 0.5
 arc_easy_margin: false
@@ -25,6 +25,8 @@ arc_ls_eps: 0.0
 optimizer: adam
 learning_rate: 3.0e-4
 weight_decay: 1.0e-6
+bnneck: false
+arcface: true
 
 # Train parameters
 accumulate_grad_batches: 1
